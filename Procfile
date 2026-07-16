@@ -1,1 +1,1 @@
-web: gunicorn cryptex_web:app
+web: gunicorn obfuscation:app
