@@ -1,1 +1,1 @@
-web: gunicorn -w 4 -b 0.0.0.0:$PORT cryptex_web:app
+web: gunicorn cryptex_web:app
