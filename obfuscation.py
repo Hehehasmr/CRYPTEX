@@ -1,5 +1,5 @@
 # ============================================================
-# CRYPTEX SHIELD - COMPLETE PLATFORM v13 (FULL WORKING CODE)
+# CRYPTEX SHIELD - COMPLETE PLATFORM v14 (FULLY WORKING)
 # ============================================================
 
 import os
@@ -46,16 +46,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(STUB_FOLDER, exist_ok=True)
 
 # ============================================================
-# POLYMORPHIC CRYPTER ENGINE v2
+# POLYMORPHIC CRYPTER ENGINE
 # ============================================================
 class CryptexEngineV2:
-    """Multi-layer polymorphic crypter engine for 0/72 FUD results"""
-    
-    ENCRYPTION_METHODS = ['aes_cbc', 'aes_cfb', 'xor_multi', 'rc4_like', 'chacha20_like']
-    
-    @staticmethod
-    def generate_mutation_key():
-        return get_random_bytes(32) if CRYPTO_AVAILABLE else os.urandom(32)
+    ENCRYPTION_METHODS = ['aes_cbc', 'aes_cfb', 'xor_multi', 'rc4_like']
     
     @staticmethod
     def rc4_like_encrypt(data, key):
@@ -123,74 +117,6 @@ class CryptexEngineV2:
         delim = random.choice(delimiters)
         final = f"{junk_chars}{delim}CRYPTEXv2{delim}{metadata_b64}{delim}{b64}{delim}{junk_chars[::-1]}"
         return final.encode()
-    
-    @staticmethod
-    def polymorphic_decrypt(encrypted_data):
-        try:
-            data = encrypted_data.decode()
-            markers = ['CRYPTEXv2']
-            start_idx = -1
-            end_idx = -1
-            
-            for marker in markers:
-                start = data.find(marker)
-                if start != -1:
-                    for delim in ['==', '--', '||', '::']:
-                        before = data.rfind(delim, 0, start)
-                        after = data.find(delim, start + len(marker))
-                        if before != -1 and after != -1:
-                            metadata_b64 = data[before + len(delim):start - len(delim)]
-                            b64_data = data[start + len(marker) + len(delim):after - len(delim)]
-                            break
-                    else:
-                        continue
-                    break
-            
-            if start_idx == -1:
-                return None
-            
-            metadata_json = base64.b64decode(metadata_b64).decode()
-            metadata = json.loads(metadata_json)
-            
-            method = metadata['method']
-            key = bytes.fromhex(metadata['key'])
-            iv = bytes.fromhex(metadata['iv'])
-            custom_alphabet = metadata['custom_alphabet']
-            
-            standard_alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-            for i, char in enumerate(custom_alphabet):
-                b64_data = b64_data.replace(char, standard_alphabet[i])
-            
-            encrypted = base64.b64decode(b64_data)
-            
-            if CRYPTO_AVAILABLE:
-                if method == 'aes_cbc':
-                    cipher = AES.new(key, AES.MODE_CBC, iv)
-                    decrypted = unpad(cipher.decrypt(encrypted), AES.block_size)
-                elif method == 'aes_cfb':
-                    cipher = AES.new(key, AES.MODE_CFB, iv)
-                    decrypted = cipher.decrypt(encrypted)
-                elif method == 'xor_multi':
-                    decrypted = CryptexEngineV2.xor_multi_encrypt(encrypted, key)
-                else:
-                    decrypted = CryptexEngineV2.rc4_like_encrypt(encrypted, key)
-            else:
-                decrypted = CryptexEngineV2.xor_multi_encrypt(encrypted, key)
-            
-            return zlib.decompress(decrypted)
-        except Exception as e:
-            print(f"Decryption error: {e}")
-            return None
-
-    @staticmethod
-    def is_sandbox():
-        try:
-            for var in ['VMWARE', 'VBOX', 'SANDBOX', 'CUCKOO', 'SBIE']:
-                if os.environ.get(var):
-                    return True
-            return False
-        except:
-            return False
 
 # ============================================================
 # STUB GENERATOR
@@ -274,12 +200,14 @@ if __name__ == '__main__':
         return stub_code
 
 # ============================================================
-# DATABASE SETUP
+# DATABASE SETUP - FIXED
 # ============================================================
 def init_db():
+    """Initialize the database with all tables"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
+    # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -293,6 +221,7 @@ def init_db():
         )
     ''')
     
+    # License keys table
     c.execute('''
         CREATE TABLE IF NOT EXISTS license_keys (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -306,6 +235,7 @@ def init_db():
         )
     ''')
     
+    # Transactions table
     c.execute('''
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -319,6 +249,7 @@ def init_db():
         )
     ''')
     
+    # Crypted files table
     c.execute('''
         CREATE TABLE IF NOT EXISTS crypted_files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -336,6 +267,7 @@ def init_db():
         )
     ''')
     
+    # Password resets table
     c.execute('''
         CREATE TABLE IF NOT EXISTS password_resets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -349,6 +281,7 @@ def init_db():
     
     conn.commit()
     
+    # Create admin account
     admin_salt = os.urandom(32).hex()
     admin_pass_hash = hashlib.pbkdf2_hmac('sha256', b'Admin', admin_salt.encode(), 100000).hex()
     c.execute('SELECT * FROM users WHERE email = "admin@cryptex.shield"')
@@ -366,6 +299,26 @@ def init_db():
               (datetime.now() + timedelta(days=3650)).isoformat(), 'infinite'))
         conn.commit()
     conn.close()
+    print("✅ Database initialized successfully!")
+
+def get_db():
+    """Get database connection, create if missing"""
+    if not os.path.exists(DB_PATH):
+        init_db()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        # Verify tables exist
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not c.fetchone():
+            conn.close()
+            os.remove(DB_PATH)
+            init_db()
+            conn = sqlite3.connect(DB_PATH)
+        return conn
+    except sqlite3.OperationalError:
+        init_db()
+        return sqlite3.connect(DB_PATH)
 
 def generate_license_key(tier='infinite'):
     prefix_map = {'1day': 'DAY1', '5day': 'DAY5', 'infinite': 'NEXUS'}
@@ -398,7 +351,7 @@ def admin_required(f):
         if 'user_id' not in session:
             flash('Please login first', 'error')
             return redirect(url_for('login'))
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
         c.execute('SELECT is_admin FROM users WHERE id = ?', (session['user_id'],))
         result = c.fetchone()
@@ -422,7 +375,7 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
         password = request.form.get('password', '').strip()
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
         c.execute('SELECT id, password_hash, salt, full_name, is_admin, is_active FROM users WHERE email = ?', (email,))
         user = c.fetchone()
@@ -456,7 +409,7 @@ def signup():
             return render_template_string(SIGNUP_TEMPLATE, error='Password must be at least 8 characters')
         if password != confirm:
             return render_template_string(SIGNUP_TEMPLATE, error='Passwords do not match')
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
         c.execute('SELECT id FROM users WHERE email = ?', (email,))
         if c.fetchone():
@@ -478,7 +431,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('SELECT key_display, expires_at, tier FROM license_keys WHERE owner_email = ? AND is_used = 0 AND expires_at > datetime("now")', (session.get('email'),))
     key_data = c.fetchone()
@@ -498,7 +451,7 @@ def dashboard():
 @app.route('/admin')
 @admin_required
 def admin_panel():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('SELECT * FROM users')
     users = c.fetchall()
@@ -536,7 +489,7 @@ def admin_generate_key():
     
     key = generate_license_key(tier)
     key_hash = hashlib.sha256(key.encode()).hexdigest()
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('INSERT INTO license_keys (key_hash, key_display, owner_email, expires_at, tier) VALUES (?, ?, ?, ?, ?)',
               (key_hash, key, email, (datetime.now() + timedelta(days=duration)).isoformat(), tier))
@@ -550,7 +503,7 @@ def admin_generate_key():
 def admin_delete_user():
     user_id = request.form.get('user_id')
     if user_id and user_id != '1':
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
         c.execute('DELETE FROM users WHERE id = ?', (user_id,))
         conn.commit()
@@ -569,7 +522,7 @@ def paypal_redirect():
     amount_map = {'1day': 4.99, '5day': 14.99, 'infinite': 29.99}
     amount = amount_map.get(tier, 29.99)
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     tx_id = 'PP-' + secrets.token_hex(8).upper()
     c.execute('INSERT INTO transactions (transaction_id, email, amount, status, tier) VALUES (?, ?, ?, ?, ?)',
@@ -599,7 +552,7 @@ def manual_key():
     email = session.get('email')
     tier = request.form.get('tier', 'infinite')
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('SELECT id FROM license_keys WHERE owner_email = ? AND is_used = 0 AND expires_at > datetime("now")', (email,))
     if c.fetchone():
@@ -636,7 +589,7 @@ def crypt_file():
         flash('No file selected', 'error')
         return redirect('/dashboard')
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('SELECT key_display FROM license_keys WHERE owner_email = ? AND is_used = 0 AND expires_at > datetime("now")', (session.get('email'),))
     if not c.fetchone():
@@ -684,7 +637,7 @@ def crypt_file():
     
     sha256_full = hashlib.sha256(encrypted_data).hexdigest()
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('INSERT INTO crypted_files (file_path, original_name, original_extension, email, method, sha256, download_id, stub_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
               (file_path, original_name, original_extension, session.get('email'), method, sha256_full, download_id, stub_path))
@@ -706,7 +659,7 @@ def crypt_file():
 @app.route('/download/<download_id>')
 @login_required
 def download_crypted(download_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('SELECT file_path, original_name, original_extension FROM crypted_files WHERE download_id = ?', (download_id,))
     result = c.fetchone()
@@ -734,7 +687,7 @@ def download_crypted(download_id):
 @app.route('/download-stub/<download_id>')
 @login_required
 def download_stub(download_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     c.execute('SELECT stub_path, original_name FROM crypted_files WHERE download_id = ?', (download_id,))
     result = c.fetchone()
@@ -763,7 +716,7 @@ def download_stub(download_id):
 def forgot_password():
     if request.method == 'POST':
         email = request.form.get('email', '').strip()
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
         c.execute('SELECT id FROM users WHERE email = ?', (email,))
         if c.fetchone():
@@ -781,7 +734,7 @@ def forgot_password():
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
     if request.method == 'POST':
         password = request.form.get('password', '').strip()
@@ -1352,26 +1305,16 @@ FORGOT_TEMPLATE = '''
 # MAIN
 # ============================================================
 if __name__ == '__main__':
-    if not os.path.exists(DB_PATH):
-        init_db()
-    else:
-        # Verify tables exist
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-            if not c.fetchone():
-                os.remove(DB_PATH)
-                init_db()
-            conn.close()
-        except:
-            init_db()
+    # Force database initialization at startup
+    print("📁 Initializing database...")
+    init_db()
+    print("✅ Database ready!")
     
     if not CRYPTO_AVAILABLE:
         print("⚠️ PyCryptodome not installed. Install with: pip install pycryptodome")
     
     print("="*70)
-    print("  ⚡ CRYPTEX SHIELD — COMPLETE PLATFORM v13")
+    print("  ⚡ CRYPTEX SHIELD — COMPLETE PLATFORM v14")
     print("  🔥 Working Crypter + Stub Generator")
     print("  📁 Upload EXE → Download functional stub")
     print("  👑 Admin: admin@cryptex.shield / Admin")
