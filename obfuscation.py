@@ -9,8 +9,7 @@ Share loader.exe with anyone - it works without Python!
 # STUB CODE STARTS HERE
 # ============================================================
 
-{stub_code}
-'''
+""" + stub_code
         return instructions
 
 # ============================================================
@@ -1199,7 +1198,7 @@ if __name__ == '__main__':
         print("⚠️ PyCryptodome not installed. Install with: pip install pycryptodome")
     
     print("="*70)
-    print("  ⚡ CRYPTEX SHIELD — COMPLETE PLATFORM v15")
+    print("  ⚡ CRYPTEX SHIELD — COMPLETE PLATFORM v16")
     print("  🔥 Working Crypter + Standalone EXE Generator")
     print("  📁 Upload EXE → Download Stub + Build Instructions")
     print("  👑 Admin: admin@cryptex.shield / Admin")
